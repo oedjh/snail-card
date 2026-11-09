@@ -1,0 +1,93 @@
+:root {
+  --bg: #14171f; --panel: #1e2430; --accent: #4ade80; --accent-p2: #f43f5e;
+  --card-bg: #2a3241; --border: #3b4559;
+}
+body {
+  margin: 0; background: var(--bg); color: #f1f5f9;
+  font-family: -apple-system, sans-serif;
+  height: 100vh; overflow: hidden; /* 鎖死全螢幕，防止整個網頁上下滑動 */
+  display: flex; flex-direction: column;
+}
+
+#start-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.95); z-index:100; display:flex; flex-direction:column; justify-content:center; align-items:center; }
+.game-title { font-size:48px; color:var(--accent); margin-bottom:8px; font-weight:bold; }
+.game-subtitle { font-size:16px; color:#94a3b8; margin-bottom:40px; }
+.btn-start-game { background:#d97706; color:#fff; border:none; padding:16px 48px; font-size:24px; border-radius:12px; cursor:pointer; font-weight:bold; }
+.btn-start-game:hover { background:#f59e0b; transform:scale(1.05); }
+
+/* 主佈局 */
+.main-layout {
+  display: flex; gap: 15px; width: 100%; height: 100%; padding: 15px; box-sizing: border-box;
+  max-width: 1200px; margin: 0 auto;
+}
+
+/* 左側：資訊與日誌 */
+.left-col { flex: 0 0 220px; display: flex; flex-direction: column; gap: 10px; height: 100%; }
+#status-bar { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+.status-item { background: #0f172a; padding: 8px; border-radius: 6px; text-align: center; }
+
+/* 日誌區 - 隱藏捲軸，鎖死滾動 */
+#log-box { 
+  background: #0f172a; border: 1px solid var(--border); border-radius: 12px; padding: 12px; 
+  flex-grow: 1; 
+  overflow: hidden; /* 核心修改：隱藏滑桿，不允許滾動 */
+  font-size: 13px; color: #cbd5e1; 
+  display: flex; flex-direction: column; justify-content: flex-end; /* 讓新訊息永遠從底部往上推 */
+}
+.log-msg { margin-bottom: 8px; border-bottom: 1px solid #1e293b; padding-bottom: 4px; animation: fadeIn 0.3s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+/* 中間：戰鬥區與手牌 */
+.center-col { flex: 1; display: flex; flex-direction: column; gap: 10px; height: 100%; min-width: 400px; }
+.board-container { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 15px; flex-grow: 1; display: flex; flex-direction: column; justify-content: space-around; }
+.player-area { display: flex; flex-direction: column; gap: 6px; flex: 1; justify-content: center; }
+.area-label { font-size: 14px; color: #94a3b8; display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.divider { border: 0; border-top: 2px solid var(--border); width: 100%; margin: 10px 0; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; grid-gap: 12px; height: 100%; }
+
+.slot { background: rgba(0,0,0,0.25); border: 2px dashed var(--border); border-radius: 8px; cursor: pointer; display: flex; flex-direction: column; transition: 0.15s; min-height: 80px; }
+.slot:hover { border-color: #64748b; }
+.slot.selectable { border-color: #38bdf8; background: rgba(56, 189, 248, 0.1); }
+.slot.targetable { border-color: #f43f5e; background: rgba(244, 63, 94, 0.15); animation: pulse 1s infinite alternate; }
+@keyframes pulse { from { opacity: 0.8; } to { opacity: 1; transform: scale(1.02); } }
+
+/* 動作選單 */
+#action-menu { display: none; justify-content: center; gap: 10px; background: var(--panel); padding: 10px; border-radius: 12px; border: 1px solid var(--border); }
+button { background: #334155; color: #fff; border: 1px solid #475569; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+button:hover { background: #475569; }
+button:disabled { background: #1e293b; color: #475569; cursor: not-allowed; }
+.btn-attack { background: #991b1b; } .btn-attack:hover { background: #b91c1c; }
+.btn-skill { background: #0284c7; } .btn-skill:hover { background: #0369a1; }
+.btn-draw { background: #d97706; } .btn-draw:hover { background: #f59e0b; }
+.btn-end { background: #475569; }
+
+/* 手牌區 */
+#hand-container { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px; height: 140px; display: flex; flex-direction: column; flex-shrink: 0; }
+.hand-actions { display: flex; gap: 8px; }
+#hand-list { display: flex; gap: 8px; overflow-x: auto; flex-grow: 1; padding-top: 8px; align-items: center; }
+.hand-card { flex: 0 0 95px; height: 95%; background: var(--card-bg); border: 1px solid #475569; border-radius: 6px; padding: 4px; box-sizing: border-box; cursor: pointer; display: flex; flex-direction: column; justify-content: space-between; transition: 0.1s; }
+.hand-card:hover { transform: translateY(-4px); }
+.hand-card.selected { border-color: #38bdf8; transform: translateY(-8px); box-shadow: 0 0 8px rgba(56,189,248,0.5); }
+
+/* 右側：卡牌說明 */
+.right-col { flex: 0 0 250px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 15px; display: flex; flex-direction: column; gap: 12px; height: 100%; overflow-y: auto; }
+.info-placeholder { color: #64748b; text-align: center; margin-top: 50px; font-size: 14px; }
+.info-name { font-size: 20px; font-weight: bold; color: #fff; text-align: center; margin-bottom: 4px; }
+.info-tags { font-size: 12px; color: #fbbf24; text-align: center; margin-bottom: 12px; }
+.info-stats-box { display: flex; justify-content: space-around; background: #0f172a; padding: 10px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #334155; }
+.info-stat { display: flex; flex-direction: column; align-items: center; }
+.info-stat-value { font-size: 20px; font-weight: bold; }
+.info-stat-label { font-size: 11px; color: #94a3b8; }
+.info-desc-title { font-size: 13px; color: #94a3b8; margin-bottom: 6px; border-bottom: 1px solid #334155; padding-bottom: 4px; }
+.info-desc { font-size: 13px; color: #e2e8f0; line-height: 1.5; }
+.info-status { margin-top: 8px; padding: 8px; background: rgba(244, 63, 94, 0.1); border-radius: 6px; color: #f43f5e; font-size: 12px; text-align: center; display: none; }
+
+/* 卡牌內部排版 */
+.card { width: 100%; height: 100%; background: var(--card-bg); border-radius: 6px; border: 1px solid #475569; display: flex; flex-direction: column; justify-content: space-between; padding: 4px; box-sizing: border-box; }
+.card.sealed { filter: grayscale(100%); border-color: #94a3b8; }
+.card-title { font-size: 13px; font-weight: bold; text-align: center; }
+.card-tags { font-size: 10px; color: #fbbf24; text-align: center; }
+.card-stats { display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; }
+.atk { color: #f87171; } .hp { color: #4ade80; }
+.btn-ai { background: #0284c7; } 
+.btn-ai:hover { background: #0369a1; }
