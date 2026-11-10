@@ -5,7 +5,7 @@
 body {
   margin: 0; background: var(--bg); color: #f1f5f9;
   font-family: -apple-system, sans-serif;
-  height: 100vh; overflow: hidden; /* 鎖死全螢幕，防止整個網頁上下滑動 */
+  height: 100vh; overflow: hidden;
   display: flex; flex-direction: column;
 }
 
@@ -26,16 +26,35 @@ body {
 #status-bar { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
 .status-item { background: #0f172a; padding: 8px; border-radius: 6px; text-align: center; }
 
-/* 日誌區 - 隱藏捲軸，鎖死滾動 */
+/* 日誌區 - 彈簧貼底版 */
 #log-box { 
-  background: #0f172a; border: 1px solid var(--border); border-radius: 12px; padding: 12px; 
+  background: #0f172a; 
+  border: 1px solid var(--border); 
+  border-radius: 12px; 
+  padding: 10px 12px; 
   flex-grow: 1; 
-  overflow: hidden; /* 核心修改：隱藏滑桿，不允許滾動 */
-  font-size: 13px; color: #cbd5e1; 
-  display: flex; flex-direction: column; justify-content: flex-end; /* 讓新訊息永遠從底部往上推 */
+  overflow: hidden; 
+  font-size: 13px; 
+  color: #cbd5e1; 
+  display: flex; 
+  flex-direction: column; 
+  gap: 6px;
+  box-sizing: border-box;
 }
-.log-msg { margin-bottom: 8px; border-bottom: 1px solid #1e293b; padding-bottom: 4px; animation: fadeIn 0.3s ease; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+.log-msg { 
+  border-bottom: 1px solid #1e293b; 
+  padding-bottom: 3px; 
+  line-height: 1.3;
+  word-break: break-all;
+  flex-shrink: 0;
+  animation: fadeIn 0.15s ease; 
+}
+
+/* 🌟 核心魔法：讓第一條訊息自帶強力彈簧，把整串訊息死死按在最底部！ */
+.log-msg:first-child {
+  margin-top: auto;
+}
 
 /* 中間：戰鬥區與手牌 */
 .center-col { flex: 1; display: flex; flex-direction: column; gap: 10px; height: 100%; min-width: 400px; }
@@ -45,7 +64,7 @@ body {
 .divider { border: 0; border-top: 2px solid var(--border); width: 100%; margin: 10px 0; }
 .grid { display: grid; grid-template-columns: 1fr 1fr; grid-gap: 12px; height: 100%; }
 
-.slot { background: rgba(0,0,0,0.25); border: 2px dashed var(--border); border-radius: 8px; cursor: pointer; display: flex; flex-direction: column; transition: 0.15s; min-height: 80px; }
+.slot { background: rgba(0,0,0,0.25); border: 2px dashed var(--border); border-radius: 8px; cursor: pointer; display: flex; flex-direction: column; transition: 0.15s; min-height: 80px; position: relative; }
 .slot:hover { border-color: #64748b; }
 .slot.selectable { border-color: #38bdf8; background: rgba(56, 189, 248, 0.1); }
 .slot.targetable { border-color: #f43f5e; background: rgba(244, 63, 94, 0.15); animation: pulse 1s infinite alternate; }
@@ -89,5 +108,26 @@ button:disabled { background: #1e293b; color: #475569; cursor: not-allowed; }
 .card-tags { font-size: 10px; color: #fbbf24; text-align: center; }
 .card-stats { display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; }
 .atk { color: #f87171; } .hp { color: #4ade80; }
-.btn-ai { background: #0284c7; } 
+.btn-ai { background: #0284c7; }
 .btn-ai:hover { background: #0369a1; }
+
+/* 🌟 全新傷害與補血跳字特效 🌟 */
+.dmg-popup {
+  position: fixed;
+  transform: translate(-50%, -50%);
+  font-weight: bold;
+  font-size: 24px;
+  text-shadow: 0px 0px 4px #000, 0px 0px 6px #000, 0px 0px 8px #000;
+  pointer-events: none;
+  z-index: 9999;
+  animation: floatUp 0.8s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+.dmg-normal { color: #fca5a5; }
+.dmg-crit { color: #fbbf24; font-size: 32px; font-style: italic; }
+.dmg-heal { color: #4ade80; }
+.dmg-miss { color: #cbd5e1; font-size: 20px; }
+
+@keyframes floatUp {
+  0% { opacity: 1; margin-top: 0; }
+  100% { opacity: 0; margin-top: -50px; }
+}

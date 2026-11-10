@@ -47,6 +47,29 @@ let hasSummoned = false, hasAttacked = false, hasUsedSkill = false, hasDrawn = f
 let selectedHandIndex = null, activeSlot = null, pendingAction = null;
 let currentHoverCard = null, isGameStarted = false;
 
+// 🌟 小工具 1：共用擲骰子
+function rollDice() { return Math.floor(Math.random() * 6) + 1; }
+
+// 🌟 小工具 2：無縫變身（繼承屬性）
+function transformCard(p, slot, newId) {
+  let old = board[p][slot];
+  if(!old) return;
+  let newCard = createCard(CARD_TEMPLATES.find(t => t.id === newId));
+  newCard.hp = old.hp; newCard.maxHp = old.maxHp;
+  newCard.isSealed = old.isSealed; newCard.justSummoned = old.justSummoned;
+  board[p][slot] = newCard;
+}
+
+// 🌟 小工具 3：範圍傷害處理（代碼瘦身利器）
+function dealAoeDamage(p, amount, sourceCard) {
+  for(let s in board[p]) {
+    if(board[p][s]) {
+      dealDamage(board[p][s], amount, sourceCard, false, p, s);
+      checkDeath(p, s, sourceCard);
+    }
+  }
+}
+
 function startGame(ai = false) {
   isAIMode = ai;
   document.getElementById('start-overlay').style.display = 'none';
@@ -72,8 +95,28 @@ function resetGameToLobby() {
 
 function logMsg(msg) {
   const box = document.getElementById("log-box");
-  box.innerHTML += `<div class="log-msg">${msg}</div>`;
-  box.scrollTop = box.scrollHeight;
+  const div = document.createElement("div");
+  div.className = "log-msg";
+  div.innerHTML = msg;
+  box.appendChild(div);
+  
+  // 維持 9 條最剛好填滿，最新的一定在最底線！
+  while (box.children.length > 9) {
+    box.removeChild(box.firstChild);
+  }
+}
+
+function showPopup(p, slot, text, type = 'normal') {
+  const el = document.getElementById(`p${p}_${slot}`);
+  if (!el) return;
+  const rect = el.getBoundingClientRect();
+  const pop = document.createElement('div');
+  pop.className = `dmg-popup dmg-${type}`;
+  pop.textContent = text;
+  pop.style.left = (rect.left + rect.width / 2) + 'px';
+  pop.style.top = (rect.top + rect.height / 2) + 'px';
+  document.body.appendChild(pop);
+  setTimeout(() => pop.remove(), 800);
 }
 
 function initGame() {
@@ -121,18 +164,26 @@ function canTarget(defPlayer, slot, attackerCard = null) {
   const c = board[defPlayer][slot];
   if(!c) return false;
   if(c.isBurrowed) return false;
-  if(attackerCard && attackerCard.isFlying) return true; // 飛行特性直接無視掩護
+  if(attackerCard && attackerCard.isFlying) return true;
   if(slot.includes('front')) return true;
   return !isFrontlineActive(defPlayer);
 }
 
-function dealDamage(target, amount, sourceCard=null, isCritical=false) {
+function dealDamage(target, amount, sourceCard=null, isCritical=false, p, slot) {
   if(!target || target.isBurrowed) return 0;
-  if(target.isSealed) { target.hp -= amount; return amount; }
+  if(target.isSealed) {
+    target.hp -= amount;
+    if(p && slot) showPopup(p, slot, `-${amount}`, isCritical ? 'crit' : 'normal');
+    return amount;
+  }
 
   if(target.id === 'butterfly') {
-    let roll = Math.floor(Math.random() * 6) + 1;
-    if(roll > 3) { logMsg(`🦋 蝴蝶擲出 ${roll} 點，成功迴避！`); playSound('skill'); return 0; }
+    let roll = rollDice();
+    if(roll > 3) {
+      logMsg(`🦋 蝴蝶擲出 ${roll} 點，成功迴避！`); playSound('skill');
+      if(p && slot) showPopup(p, slot, 'Miss!', 'miss');
+      return 0;
+    }
     else logMsg(`🦋 蝴蝶擲出 ${roll} 點，迴避失敗！`);
   }
 
@@ -141,7 +192,8 @@ function dealDamage(target, amount, sourceCard=null, isCritical=false) {
     logMsg(`🛡️ 地龍王厚甲抵消 5 點傷害！實受 ${amount} 傷害！`);
   }
 
-  if(target.id === 'golden_beetle' || target.id === 'rock') {
+  // 🌟 使用 isSteel 取代寫死的名字
+  if(target.isSteel) {
     if(isCritical) {
       logMsg(`💥 暴擊貫穿鋼鐵！防禦失效！`);
     } else {
@@ -150,6 +202,7 @@ function dealDamage(target, amount, sourceCard=null, isCritical=false) {
   }
 
   target.hp -= amount;
+  if(p && slot) showPopup(p, slot, `-${amount}`, isCritical ? 'crit' : 'normal');
   return amount;
 }
 
@@ -194,7 +247,7 @@ function onSlotClick(p, slot) {
     if(board[p][slot] !== null) { logMsg("⚠️ 該位置已有怪獸！"); playSound('error'); return; }
     let c = hands[turn].splice(selectedHandIndex, 1)[0];
     if(c.isQuick) c.quickBuff = true;
-    c.justSummoned = true; // 標記為剛進場
+    c.justSummoned = true;
     board[p][slot] = c; hasSummoned = true; selectedHandIndex = null;
     playSound('summon');
     logMsg(`✨ P${turn} 召喚了 【${c.name}】！`); clearHover(); render(); return;
@@ -203,7 +256,7 @@ function onSlotClick(p, slot) {
   if(pendingAction === 'skill_yang') {
     if(p === turn && board[p][slot]) {
       let target = board[p][slot];
-      if(target.id === 'golden_beetle' || target.id === 'rock') {
+      if(target.isSteel) { // 🌟 改用 isSteel
         logMsg("⚠️ 鋼鐵身軀無法受到生命治療！");
         playSound('error');
         return;
@@ -212,6 +265,7 @@ function onSlotClick(p, slot) {
       target.hp += heal;
       playSound('skill');
       logMsg(`✨ 【陽】為【${target.name}】恢復了 ${heal} 點生命值！`);
+      showPopup(turn, slot, `+${heal}`, 'heal');
       board[turn][activeSlot].yangHealed = true;
       if(board[turn][activeSlot].quickBuff) board[turn][activeSlot].quickBuff = false;
       else hasUsedSkill = true;
@@ -237,12 +291,11 @@ function onSlotClick(p, slot) {
 
     document.getElementById('btn-atk').disabled = (!c.quickBuff && hasAttacked);
 
-    // 嚴格判定技能是否可用
     let canUseSkill = true;
     if(!c.hasActiveSkill || c.isSealed || (c.skillUsedLimit && c.id !== 'salmon')) {
       canUseSkill = false;
     } else if(c.justSummoned && !c.isQuick) {
-      canUseSkill = false; // 剛進場且沒有速攻，禁止發動技能
+      canUseSkill = false;
     } else if(!c.quickBuff && hasUsedSkill) {
       canUseSkill = false;
     }
@@ -284,14 +337,13 @@ function executeActionTarget(defP, defSlot) {
     if(attacker.quickBuff) attacker.quickBuff = false; else hasAttacked = true;
 
     let strikes = 1;
-    let isDiamondSix = false;
     if(attacker.isDoubleStrike) strikes = 2;
     if(attacker.isTripleStrike) strikes = 3;
     if(attacker.isDiamond) {
-      let roll = Math.floor(Math.random() * 6) + 1;
+      let roll = rollDice();
       logMsg(`💎 鑽石先生擲出了 ${roll} 點！`);
       if(roll >= 4 && roll <= 5) attacker.tempCrit = true;
-      if(roll === 6) { attacker.tempCrit = true; strikes = 2; isDiamondSix = true; logMsg(`✨✨ 雙重暴擊觸發！！`); }
+      if(roll === 6) { attacker.tempCrit = true; strikes = 2; logMsg(`✨✨ 雙重暴擊觸發！！`); }
     }
 
     for(let i=0; i<strikes; i++) {
@@ -309,29 +361,27 @@ function executeActionTarget(defP, defSlot) {
         playSound('attack');
       }
 
-      // 屠龍者特效
       if(attacker.isDragonSlayer && defender.isDragon) {
         finalAtk *= 2;
         logMsg(`🐉 屠龍者發揮全力！對龍族造成雙倍傷害！`);
       }
 
-      let dmg = dealDamage(board[defP][defSlot], finalAtk, attacker, isCrit);
+      let dmg = dealDamage(board[defP][defSlot], finalAtk, attacker, isCrit, defP, defSlot);
       let comboText = strikes > 1 ? ` (第 ${i+1} 擊)` : '';
       logMsg(`⚔️ 【${attacker.name}】 攻擊 【${board[defP][defSlot].name}】 造成 ${dmg} 傷害！${comboText}`);
 
-      // 火龍王濺射
       if(attacker.isFireSplash && !attacker.isSealed) {
         let col = defSlot.split('_')[1]; let oppCol = col === 'l' ? 'r' : 'l';
         let row = defSlot.split('_')[0]; let splashSlot = `${row}_${oppCol}`;
         if(board[defP][splashSlot] && !board[defP][splashSlot].isBurrowed) {
-          let sDmg = dealDamage(board[defP][splashSlot], 7, attacker);
+          let sDmg = dealDamage(board[defP][splashSlot], finalAtk, attacker, false, defP, splashSlot);
           logMsg(`🔥 火龍王濺射！【${board[defP][splashSlot].name}】 同時受到 ${sDmg} 傷害！`);
           checkDeath(defP, splashSlot, attacker);
         }
       }
 
       if(defender.id === 'cactus' && !defender.isSealed && dmg > 0 && board[turn][activeSlot]) {
-        let retDmg = dealDamage(attacker, 5, defender);
+        let retDmg = dealDamage(attacker, 5, defender, false, turn, activeSlot);
         logMsg(`🌵 仙人掌反彈刺傷！【${attacker.name}】 受到 ${retDmg} 反彈傷害！`);
         checkDeath(turn, activeSlot, defender);
       }
@@ -339,7 +389,7 @@ function executeActionTarget(defP, defSlot) {
       if(attacker.id === 'beetle_elder' && !attacker.isSealed) {
         const col = defSlot.split('_')[1]; const backSlot = `back_${col}`;
         if(defSlot.includes('front') && board[defP][backSlot] && !board[defP][backSlot].isBurrowed) {
-          let pDmg = dealDamage(board[defP][backSlot], attacker.atk, attacker);
+          let pDmg = dealDamage(board[defP][backSlot], attacker.atk, attacker, false, defP, backSlot);
           logMsg(`🌪️ 長老貫穿！後排 【${board[defP][backSlot].name}】 受到 ${pDmg} 傷害！`);
           checkDeath(defP, backSlot, attacker);
         }
@@ -347,7 +397,6 @@ function executeActionTarget(defP, defSlot) {
       checkDeath(defP, defSlot, attacker);
     }
 
-    // 鮭魚洄游
     if(attacker.isBoomerang && !attacker.isSealed && board[turn][activeSlot]) {
       if(Math.random() < 0.5 && hands[turn].length < 7) {
         logMsg(`🐟 【${attacker.name}】 攻擊完畢，瞬間洄游彈回了手牌！`);
@@ -359,24 +408,21 @@ function executeActionTarget(defP, defSlot) {
 
     delete attacker.tempCrit;
 
+    // 🌟 使用變身工具，完美繼承
     if(attacker.id === 'yin' && board[turn][activeSlot] && !attacker.isSealed) {
       playSound('skill');
       logMsg(`☯️ 【陰】轉化為【陽】形態！`);
-      let currentHp = attacker.hp;
-      board[turn][activeSlot] = {
-        id: 'yang', name: '陽', rarity: 'SR', atk: 0, hp: currentHp, maxHp: 20,
-        tags: '雙生 / 治療', isYang: true, hasActiveSkill: true, isToken: true,
-        aiRole: 'support', aiTarget: 'none', yangHealed: false,
-        skillDesc: '【治療】發動能力：為一名友方怪獸恢復 10 點血量。若本回合使用能力，回合結束將變回「陰」。'
-      };
+      transformCard(turn, activeSlot, 'yang');
     }
 
     for(let s in board[turn]) {
       let ally = board[turn][s];
-      if(ally && ally.id === 'doggo' && !ally.isSealed && s !== activeSlot && board[defP][defSlot] && !board[defP][defSlot].isBurrowed) {
-        let dDmg = dealDamage(board[defP][defSlot], ally.atk, ally);
-        logMsg(`🐕 狗勾追擊！咬了 【${defender.name}】 造成 ${dDmg} 傷害！`); playSound('attack');
-        checkDeath(defP, defSlot, ally);
+      if(ally && ally.id === 'doggo' && !ally.isSealed && s !== activeSlot) {
+        if(board[defP][defSlot] && !board[defP][defSlot].isBurrowed) {
+          let dDmg = dealDamage(board[defP][defSlot], ally.atk, ally, false, defP, defSlot);
+          logMsg(`🐕 狗勾追擊！咬了 【${board[defP][defSlot].name}】 造成 ${dDmg} 傷害！`); playSound('attack');
+          checkDeath(defP, defSlot, ally);
+        }
       }
     }
   }
@@ -386,7 +432,7 @@ function executeActionTarget(defP, defSlot) {
 
     playSound('skill');
     if(pendingAction === 'skill_furball') {
-      logMsg(`💣 【毛球】死亡發動！【${defender.name}】暴斃！`); defender.hp = 0; checkDeath(defP, defSlot, attacker); attacker.hp = 0; checkDeath(turn, activeSlot);
+      logMsg(`💣 【毛球】死亡發動！【${defender.name}】暴斃！`); dealDamage(defender, defender.hp, attacker, false, defP, defSlot); checkDeath(defP, defSlot, attacker); attacker.hp = 0; checkDeath(turn, activeSlot);
     } else if(pendingAction === 'skill_diablo') {
       logMsg(`👿 【迪亞布羅】發動收買！【${defender.name}】直接叛逃並進駐己方位置！`);
       board[defP][defSlot] = null; board[turn][activeSlot] = defender; sharedGraveyard.push(attacker);
@@ -400,7 +446,7 @@ function executeActionTarget(defP, defSlot) {
       logMsg(`🌪️ 【風龍王】強行將【${defender.name}】與前後方位置對調！`);
     } else if(pendingAction === 'skill_brave') {
       logMsg(`⚔️ 【鍬形蟲勇者】發動額外斬擊！`);
-      let dmg = dealDamage(defender, attacker.atk, attacker);
+      let dmg = dealDamage(defender, attacker.atk, attacker, false, defP, defSlot);
       logMsg(`💥 勇者對【${defender.name}】造成 ${dmg} 傷害！`);
       checkDeath(defP, defSlot, attacker);
     }
@@ -426,38 +472,42 @@ function executeAutoSkill(attacker) {
       logMsg(`🪨 敵方場上存在【越求的俗頭】！血月的破壞光線被徹底吸收！`);
     } else {
       logMsg(`🩸 【血月】發射破壞光線！敵方全體受到 10 點傷害！`);
-      for(let s in board[op]) {
-        if(board[op][s]) {
-          dealDamage(board[op][s], 10, attacker);
-          checkDeath(op, s, attacker);
-        }
-      }
+      dealAoeDamage(op, 10, attacker); // 🌟 使用簡化的 AOE 呼叫
     }
     attacker.skillUsedLimit = true;
   }
   else if(attacker.id === 'poison_mushroom') {
     logMsg(`🍄 【毒蘑菇】釋放毒氣！全場受到波及！`);
-    for(let s in board[turn]) { if(board[turn][s]) { dealDamage(board[turn][s], 5, attacker); checkDeath(turn, s, attacker); } }
-    const op = turn === 1 ? 2 : 1;
-    for(let s in board[op]) { if(board[op][s]) { dealDamage(board[op][s], 10, attacker); checkDeath(op, s, attacker); } }
+    dealAoeDamage(turn, 5, attacker);
+    dealAoeDamage(turn === 1 ? 2 : 1, 10, attacker);
     attacker.skillUsedLimit = true;
   }
   else if(attacker.id === 'fanny') {
-    let effect = Math.floor(Math.random() * 6) + 1;
+    let effect = rollDice();
     const op = turn === 1 ? 2 : 1;
     logMsg(`🎲 【芬妮】搖出了事件 ${effect} 號！`);
     if(effect === 1) {
       logMsg(`💥 【全場毒爆】己方全體受到 5 點傷害！`);
-      for(let s in board[turn]) { if(board[turn][s]) { dealDamage(board[turn][s], 5, attacker); checkDeath(turn, s, attacker); } }
+      dealAoeDamage(turn, 5, attacker);
     } else if(effect === 2) {
       logMsg(`👼 【大天使恩惠】己方血肉怪獸恢復 10 點生命值！`);
-      for(let s in board[turn]) { if(board[turn][s] && board[turn][s].id !== 'golden_beetle' && board[turn][s].id !== 'rock') { board[turn][s].hp = Math.min(board[turn][s].maxHp, board[turn][s].hp + 10); } }
+      for(let s in board[turn]) {
+        if(board[turn][s] && !board[turn][s].isSteel) { // 🌟 使用 isSteel
+          let heal = Math.min(10, board[turn][s].maxHp - board[turn][s].hp);
+          if(heal > 0) { board[turn][s].hp += heal; showPopup(turn, s, `+${heal}`, 'heal'); }
+        }
+      }
     } else if(effect === 3) {
       let p = Math.random() < 0.5 ? turn : op; logMsg(`🎁 【補給箱】隨機 P${p} 獲得一張手牌！`);
       if(hands[p].length < 7 && decks[p].length > 0) hands[p].push(decks[p].pop());
     } else if(effect === 4) {
       let p = Math.random() < 0.5 ? turn : op; let targets = Object.keys(board[p]).filter(s => board[p][s]);
-      if(targets.length > 0) { let s = targets[Math.floor(Math.random() * targets.length)]; board[p][s].atk += 5; logMsg(`💉 【亢奮注入】P${p} 的【${board[p][s].name}】攻擊力永久 +5！`); }
+      if(targets.length > 0) {
+        let s = targets[Math.floor(Math.random() * targets.length)];
+        board[p][s].atk += 5;
+        logMsg(`💉 【亢奮注入】P${p} 的【${board[p][s].name}】攻擊力永久 +5！`);
+        showPopup(p, s, 'ATK UP!', 'heal');
+      }
     } else if(effect === 5) {
       let p = Math.random() < 0.5 ? turn : op; kills[p] = Math.max(0, kills[p] - 1); logMsg(`⏳ 【時光倒流】P${p} 的擊殺數減少 1！`);
     } else if(effect === 6) {
@@ -487,16 +537,20 @@ function endTurn(isAuto = false) {
       let healedAny = false;
       for(let os in board[turn]) {
         let ally = board[turn][os];
-        if(os !== s && ally && ally.id !== 'golden_beetle' && ally.id !== 'rock') {
-          ally.hp = Math.min(ally.maxHp, ally.hp + 5);
-          healedAny = true;
+        if(os !== s && ally && !ally.isSteel) { // 🌟 使用 isSteel
+          let heal = Math.min(5, ally.maxHp - ally.hp);
+          if(heal > 0) {
+            ally.hp += heal;
+            showPopup(turn, os, `+${heal}`, 'heal');
+            healedAny = true;
+          }
         }
       }
       if(healedAny) logMsg(`🍦 【冰淇淋】為己方肉身怪獸各恢復 5 點生命值！`);
     }
 
     if(c.id === 'worm' && !c.isSealed) {
-      let roll = Math.floor(Math.random() * 6) + 1;
+      let roll = rollDice();
       if(roll >= 4) {
         c.isBurrowed = true;
         logMsg(`🪱 沙地蠕蟲擲出 ${roll} 點，成功鑽入地下！`);
@@ -508,11 +562,7 @@ function endTurn(isAuto = false) {
     if(c.id === 'yang' && c.yangHealed) {
       playSound('skill');
       logMsg(`☯️ 【陽】回歸為【陰】形態！`);
-      board[turn][s] = {
-        id: 'yin', name: '陰', rarity: 'SR', atk: 10, hp: c.hp, maxHp: 20,
-        tags: '雙生 / 轉化', isYin: true, aiRole: 'dps', aiTarget: 'lowest_hp',
-        skillDesc: '【雙生】普通攻擊結算後，會立即轉換為輔助形態「陽」，並保留當前血量。'
-      };
+      transformCard(turn, s, 'yin'); // 🌟 無縫變身
     }
 
     if(c.id === 'snail' && !c.isSealed) {
@@ -524,13 +574,12 @@ function endTurn(isAuto = false) {
       }
     }
 
-    // 草 蔓延
     if(c.isGrass && !c.isSealed) {
       let emptySlots = Object.keys(board[turn]).filter(es => !board[turn][es]);
       if(emptySlots.length > 0 && Math.random() < 0.5) {
         let spawnSlot = emptySlots[Math.floor(Math.random() * emptySlots.length)];
         board[turn][spawnSlot] = createCard(CARD_TEMPLATES.find(t => t.id === 'little_grass'));
-        board[turn][spawnSlot].justSummoned = false; // 長出來的小草下回合就能動
+        board[turn][spawnSlot].justSummoned = false;
         logMsg(`🌱 【草】蔓延了！在空位生成了一株小草！`);
       }
     }
@@ -542,11 +591,10 @@ function endTurn(isAuto = false) {
   hasSummoned = false; hasAttacked = false; hasUsedSkill = false; hasDrawn = false;
   cancelAction(); selectedHandIndex = null;
 
-  // 新回合開始：解鎖進場冷卻與恢復遁地
   for(let s in board[turn]) {
     let c = board[turn][s];
     if(c) {
-      c.justSummoned = false; // 正式解鎖技能！
+      c.justSummoned = false;
       if(c.isBurrowed) {
         c.isBurrowed = false;
         logMsg(`🪱 【${c.name}】 從地下鑽出地面！`);
@@ -554,7 +602,7 @@ function endTurn(isAuto = false) {
     }
   }
 
-  logMsg(`<br>🔄 輪到 P${turn} 回合！請點擊「🃏 抽 2 張」。`);
+  logMsg(`🔄 輪到 P${turn} 回合！請點擊「🃏 抽 2 張」。`);
   render();
 
   if(isAIMode && turn === 2) {
@@ -573,10 +621,10 @@ function chooseAITarget(pref) {
   if (pref === 'highest_atk') targets.sort((a,b) => b.card.atk - a.card.atk);
   else if (pref === 'lowest_hp') targets.sort((a,b) => a.card.hp - b.card.hp);
   else if (pref === 'steel') {
-    let st = targets.find(t => t.card.id === 'golden_beetle' || t.card.id === 'rock');
+    let st = targets.find(t => t.card.isSteel); // 🌟 使用 isSteel
     if(st) return st.slot;
   }
-  let nonSteel = targets.filter(t => t.card.id !== 'golden_beetle' && t.card.id !== 'rock');
+  let nonSteel = targets.filter(t => !t.card.isSteel); // 🌟 使用 isSteel
   if (pref !== 'steel' && nonSteel.length > 0) return nonSteel[0].slot;
   return targets[0].slot;
 }
@@ -679,7 +727,7 @@ async function runAITurn() {
     if(actor.card.id === 'yang' && useSkill) {
       let allies = Object.keys(board[2])
       .map(s => ({slot: s, card: board[2][s]}))
-      .filter(o => o.card && o.card.hp < o.card.maxHp && o.card.id !== 'golden_beetle' && o.card.id !== 'rock');
+      .filter(o => o.card && o.card.hp < o.card.maxHp && !o.card.isSteel); // 🌟 使用 isSteel
 
       if(allies.length > 0) {
         allies.sort((a,b) => (a.card.maxHp - a.card.hp) - (b.card.maxHp - b.card.hp));
