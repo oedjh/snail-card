@@ -57,14 +57,35 @@ body {
 }
 
 /* 中間：戰鬥區與手牌 */
-.center-col { flex: 1; display: flex; flex-direction: column; gap: 10px; height: 100%; min-width: 400px; }
-.board-container { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 15px; flex-grow: 1; display: flex; flex-direction: column; justify-content: space-around; }
-.player-area { display: flex; flex-direction: column; gap: 6px; flex: 1; justify-content: center; }
-.area-label { font-size: 14px; color: #94a3b8; display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-.divider { border: 0; border-top: 2px solid var(--border); width: 100%; margin: 10px 0; }
-.grid { display: grid; grid-template-columns: 1fr 1fr; grid-gap: 12px; height: 100%; }
+.center-col { flex: 1; display: flex; flex-direction: column; gap: 8px; height: 100%; min-width: 400px; min-height: 0; }
+.board-container { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
+.player-area { display: flex; flex-direction: column; flex: 1 1 0; min-height: 0; justify-content: space-between; }
+.player-area > div[style*="display: flex"] { flex: 1 1 0; min-height: 0; }
+.area-label { font-size: 13px; color: #94a3b8; display: flex; justify-content: space-between; align-items: center; }
+.divider { border: 0; border-top: 1px solid var(--border); width: 100%; margin: 2px 0; }
 
-.slot { background: rgba(0,0,0,0.25); border: 2px dashed var(--border); border-radius: 8px; cursor: pointer; display: flex; flex-direction: column; transition: 0.15s; min-height: 80px; position: relative; }
+.grid { 
+  display: grid; 
+  grid-template-columns: 1fr 1fr; 
+  grid-template-rows: 1fr 1fr; 
+  grid-gap: 6px; 
+  height: 100%; 
+  min-height: 0; 
+}
+
+.slot { 
+  background: rgba(0,0,0,0.25); 
+  border: 2px dashed var(--border); 
+  border-radius: 8px; 
+  cursor: pointer; 
+  display: flex; 
+  flex-direction: column; 
+  transition: 0.15s; 
+  height: 100%; 
+  min-height: 50px; /* 給予最低保底高度，絕不壓成一條線 */
+  position: relative; 
+  box-sizing: border-box;
+}
 .slot:hover { border-color: #64748b; }
 .slot.selectable { border-color: #38bdf8; background: rgba(56, 189, 248, 0.1); }
 .slot.targetable { border-color: #f43f5e; background: rgba(244, 63, 94, 0.15); animation: pulse 1s infinite alternate; }
@@ -130,4 +151,85 @@ button:disabled { background: #1e293b; color: #475569; cursor: not-allowed; }
 @keyframes floatUp {
   0% { opacity: 1; margin-top: 0; }
   100% { opacity: 0; margin-top: -50px; }
+}
+
+/* ==========================================
+   🌟 新手教學專屬樣式 (Tutorial Mode)
+========================================== */
+.btn-tutorial { background: #10b981; }
+.btn-tutorial:hover { background: #059669; }
+
+/* 教學橫幅 (小黑板) 改為絕對定位浮動 */
+#tutorial-banner {
+  display: flex;
+  width: 100%;
+  box-sizing: border-box;
+  flex-shrink: 0; /* 自己不縮水，去擠壓下面的戰鬥區 */
+  align-items: center;
+  background: rgba(15, 23, 42, 0.95);
+  border: 2px solid #fbbf24;
+  border-radius: 12px;
+  padding: 8px 15px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5), 0 0 10px rgba(251, 191, 36, 0.2);
+  gap: 15px;
+  animation: slideDown 0.4s ease-out;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.tutorial-icon {
+  font-size: 32px;
+  filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.6));
+}
+
+.tutorial-content {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tutorial-title {
+  color: #fbbf24;
+  font-size: 16px;
+  font-weight: bold;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+}
+
+.tutorial-desc {
+  color: #e2e8f0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.btn-exit-tutorial {
+  background: transparent;
+  color: #94a3b8;
+  border: 1px solid #475569;
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-exit-tutorial:hover {
+  background: #334155;
+  color: #f1f5f9;
+}
+
+/* 教學嚴格防呆高亮 (金邊呼吸) */
+.tutorial-highlight {
+  position: relative;
+  z-index: 10;
+  border-color: #fbbf24 !important;
+  box-shadow: 0 0 0 2px #fbbf24, 0 0 15px rgba(251, 191, 36, 0.6) !important;
+  animation: tutorialPulse 1.5s infinite alternate !important;
+}
+
+@keyframes tutorialPulse {
+  from { box-shadow: 0 0 0 2px #fbbf24, 0 0 5px rgba(251, 191, 36, 0.3); }
+  to { box-shadow: 0 0 0 2px #fbbf24, 0 0 20px rgba(251, 191, 36, 0.8); transform: scale(1.02); }
 }

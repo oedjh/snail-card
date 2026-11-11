@@ -14,6 +14,8 @@
     <div style="display:flex; gap: 15px;">
       <button class="btn-start-game" onclick="startGame(false)">⚔️ 雙人本機對決</button>
       <button class="btn-start-game btn-ai" onclick="startGame(true)">🤖 單人電腦對決</button>
+      <!-- 🌟 新增：新手教學按鈕 -->
+      <button class="btn-start-game btn-tutorial" onclick="startTutorial()">🎓 新手教學</button>
     </div>
   </div>
 
@@ -30,6 +32,17 @@
     </div>
 
     <div class="center-col">
+      <!-- 🌟 新增：教學提示小黑板 (預設隱藏) -->
+      <div id="tutorial-banner" style="display: none;">
+        <div class="tutorial-icon">🐌</div>
+        <div class="tutorial-content">
+          <div id="tutorial-title" class="tutorial-title">任務 1：教學準備中...</div>
+          <div id="tutorial-desc" class="tutorial-desc">💡 提示內容載入中</div>
+        </div>
+        <!-- 💡 修正 1：改為呼叫專屬退出函數 -->
+        <button class="btn-exit-tutorial" onclick="exitTutorial()">✕ 退出教學</button>
+      </div>
+
       <div class="board-container">
         
         <!-- 敵方場地 (P2) -->
@@ -96,5 +109,7 @@
 
   <script src="cards.js"></script>
   <script src="game.js"></script>
+  <!-- 🌟 新增：獨立的新手教學劇本邏輯 -->
+  <script src="tutorial.js"></script>
 </body>
 </html>
