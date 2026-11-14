@@ -345,12 +345,9 @@ function executeActionTarget(defP, defSlot) {
     }
     delete attacker.tempCrit;
 
-    // 陰陽轉化
-    if(attacker.transformOnAttack && board[turn][activeSlot] && !attacker.isSealed) {
-      playSound('skill'); logMsg(`☯️ 【${attacker.name}】形態轉化！`);
-      let newCard = createCard(CARD_TEMPLATES.find(t => t.id === attacker.transformOnAttack));
-      newCard.hp = attacker.hp; board[turn][activeSlot] = newCard;
-      showPopup(turn, activeSlot, '轉化', 'heal');
+    // 陰陽轉化標記 (留到回合結束再變身)
+    if(attacker.id === 'yin' && board[turn][activeSlot] && !attacker.isSealed) {
+      attacker.yinAttacked = true;
     }
 
     // 鮭魚洄游

@@ -93,18 +93,17 @@ const SKILL_DICT = {
     attacker.skillUsedLimit = true;
   },
 
-  // 陽：治療友方
+  // 陽：治療友方 (可治療自己，且即使目標滿血也能觸發形態切換)
   heal_ally: (attacker, defender, ctx) => {
     if(defender.isSteel) {
-      ctx.logMsg("⚠️ 鋼鐵身軀無法受到生命治療！"); ctx.playSound('error'); return;
+      ctx.logMsg("⚠️ 鋼鐵身軀無法受到生命治療，但陽依然釋放了光輝！");
+    } else {
+      let heal = Math.min(10, defender.maxHp - defender.hp);
+      defender.hp += heal;
+      let targetText = (attacker === defender) ? '自己' : `【${defender.name}】`;
+      ctx.logMsg(`✨ 【${attacker.name}】為${targetText}恢復了 ${heal} 點生命值！`);
+      ctx.showPopup(ctx.defP, ctx.defSlot, `+${heal}`, 'heal');
     }
-    let heal = Math.min(10, defender.maxHp - defender.hp);
-    if (heal <= 0) {
-      ctx.logMsg("⚠️ 目標生命值已滿！"); ctx.playSound('error'); return;
-    }
-    defender.hp += heal;
-    ctx.logMsg(`✨ 【${attacker.name}】為【${defender.name}】恢復了 ${heal} 點生命值！`);
-    ctx.showPopup(ctx.defP, ctx.defSlot, `+${heal}`, 'heal');
     attacker.yangHealed = true;
   },
 
@@ -215,7 +214,21 @@ const PASSIVE_DICT = {
     if (card.yangHealed) {
       ctx.playSound('skill'); ctx.logMsg(`☯️ 【陽】回歸為【陰】形態！`);
       let newCard = createCard(CARD_TEMPLATES.find(t => t.id === 'yin'));
-      newCard.hp = card.hp; ctx.board[ctx.turn][ctx.slot] = newCard;
+      newCard.hp = card.hp;
+      newCard.maxHp = card.maxHp; // 🌟 繼承最大血量上限
+      newCard.atk += card.atk;    // 🌟 繼承「陽」形態期間吃到的額外攻擊力增益 (陽基礎攻為0)
+      ctx.board[ctx.turn][ctx.slot] = newCard;
+      ctx.showPopup(ctx.turn, ctx.slot, '轉化', 'heal');
+    }
+  },
+  yin_transform: (card, ctx) => {
+    if (card.yinAttacked) {
+      ctx.playSound('skill'); ctx.logMsg(`☯️ 【陰】形態轉化為【陽】！`);
+      let newCard = createCard(CARD_TEMPLATES.find(t => t.id === 'yang'));
+      newCard.hp = card.hp;
+      newCard.maxHp = card.maxHp; // 🌟 繼承最大血量上限
+      newCard.atk = Math.max(0, card.atk - 10); // 🌟 保留「陰」形態吃到的額外攻擊力增益 (扣除陰基礎攻10)
+      ctx.board[ctx.turn][ctx.slot] = newCard;
       ctx.showPopup(ctx.turn, ctx.slot, '轉化', 'heal');
     }
   },
@@ -248,7 +261,7 @@ const CARD_TEMPLATES = [
   { id: 'salmon', name: '鮭魚神', rarity: 'SSR', atk: 10, hp: 20, tags: '詛咒 / 復活', hasActiveSkill: true, aiRole: 'support', aiTarget: 'none', skillTarget: 'none', isSuicide: true, needsGraveyard: true, onSkill: SKILL_DICT.revive_self_destruct, skillDesc: '【復活】發動特殊能力：犧牲自己送入墓地，並復活當前墓地最底部的怪獸至自身空位。' },
   { id: 'ice_dragon', name: '冰龍王', rarity: 'SR', atk: 15, hp: 30, tags: '封印', isDragon: true, hasActiveSkill: true, aiRole: 'dps', aiTarget: 'highest_atk', skillTarget: 'enemy', onSkill: SKILL_DICT.seal, skillDesc: '【封印】發動特殊能力：使一名敵方怪獸永久失去特殊能力 (每局限發動一次)。' },
   { id: 'wind_dragon', name: '風龍王', rarity: 'SR', atk: 15, hp: 20, tags: '控場 / 大風吹', isDragon: true, hasActiveSkill: true, aiRole: 'support', aiTarget: 'highest_atk', skillTarget: 'enemy', onSkill: SKILL_DICT.great_wind, skillDesc: '【控場】發動能力：發動大風吹！將目標所在的一路(左或右)的前後排強制互換位置 (限一次)。' },
-  { id: 'bloodmoon', name: '血月', rarity: 'SSR', atk: 20, hp: 30, tags: '速攻 / 光線', isQuick: true, hasActiveSkill: true, aiRole: 'dps', aiTarget: 'none', skillTarget: 'none', onSkill: SKILL_DICT.aoe_laser, skillDesc: '【破壞光線】發動特殊能力：釋放全域能量，對敵方場上所有怪獸各造成 10 點傷害。' },
+  { id: 'bloodmoon', name: '血月', rarity: 'SSR', atk: 15, hp: 20, tags: '速攻 / 光線', isQuick: true, hasActiveSkill: true, aiRole: 'dps', aiTarget: 'none', skillTarget: 'none', onSkill: SKILL_DICT.aoe_laser, skillDesc: '【破壞光線】發動特殊能力：釋放全域能量，對敵方場上所有怪獸各造成 10 點傷害。' },
   { id: 'butterfly', name: '蝴蝶', rarity: 'N', atk: 10, hp: 1, tags: '迴避', aiRole: 'tank', aiTarget: 'lowest_hp', dodgeChance: 0.5, skillDesc: '【迴避】受傷時擲 6 面骰，若點數大於 3，則完全免疫該次傷害。' },
   { id: 'dung_beetle', name: '糞金龜', rarity: 'R', atk: 5, hp: 30, tags: '必定暴擊', isCrit: true, aiRole: 'tank', aiTarget: 'steel', skillDesc: '【必定暴擊】每次攻擊必定觸發暴擊(1.5倍傷害)，且暴擊可無視鋼鐵減傷！' },
 
@@ -258,15 +271,15 @@ const CARD_TEMPLATES = [
   // --- 全新擴充陣容 ---
   { id: 'worm', name: '沙地蠕蟲', rarity: 'SR', atk: 15, hp: 20, tags: '游擊 / 遁地', aiRole: 'dps', aiTarget: 'lowest_hp', onTurnEnd: PASSIVE_DICT.burrow, skillDesc: '【遁地】回合結束時擲骰 >= 4 暫時鑽入地下免疫攻擊與傷害，己方回合開始時鑽回地面。' },
   { id: 'diamond', name: '鑽石先生', rarity: 'SSR', atk: 10, hp: 20, tags: '發光 / 爆發', isDiamond: true, aiRole: 'dps', aiTarget: 'highest_atk', skillDesc: '【發光】普攻時擲骰：點數 4~5 觸發暴擊；點數 6 觸發【暴擊＋雙連擊】轟殺目標！' },
-  { id: 'bird', name: '鳥', rarity: 'N', atk: 5, hp: 10, tags: '雙連擊 / 飛行', isDoubleStrike: true, isFlying: true, aiRole: 'assassin', aiTarget: 'lowest_hp', skillDesc: '【雙連擊】【飛行】無視前排掩護可直擊後排。每次普攻連續攻擊兩次。' },
-  { id: 'yin', name: '陰', rarity: 'SR', atk: 10, hp: 20, tags: '雙生 / 轉化', transformOnAttack: 'yang', aiRole: 'dps', aiTarget: 'lowest_hp', skillDesc: '【雙生】普通攻擊結算後，會立即轉換為輔助形態「陽」，並保留當前血量。' },
+  { id: 'bird', name: '鳥', rarity: 'N', atk: 3, hp: 10, tags: '雙連擊 / 飛行', isDoubleStrike: true, isFlying: true, aiRole: 'assassin', aiTarget: 'lowest_hp', skillDesc: '【雙連擊】【飛行】無視前排掩護可直擊後排。每次普攻連續攻擊兩次。' },
+  { id: 'yin', name: '陰', rarity: 'SR', atk: 10, hp: 20, tags: '雙生 / 轉化', onTurnEnd: PASSIVE_DICT.yin_transform, aiRole: 'dps', aiTarget: 'lowest_hp', skillDesc: '【雙生】本回合若發動過普通攻擊，在己方回合結束時會轉換為輔助形態「陽」，並繼承所有狀態。' },
   { id: 'rock', name: '越求的俗頭', rarity: 'R', atk: 0, hp: 3, tags: '鋼鐵 / 防護', isSteel: true, aoeProtect: true, isRock: true, aiRole: 'tank', aiTarget: 'none', skillDesc: '【鋼鐵】【防護】極硬的神石，每次受傷只受到1點傷害。存在於場上時，己方全體完全免疫敵方範圍傷害。' },
   { id: 'earth_dragon', name: '地龍王', rarity: 'SSR', atk: 5, hp: 40, tags: '厚甲 / 護盾', isDragon: true, armor: 5, aiRole: 'tank', aiTarget: 'lowest_hp', skillDesc: '【護盾】巍峨巨龍。每次受到的所有傷害直接減免 5 點。' },
   { id: 'icecream', name: '冰淇淋', rarity: 'R', atk: 0, hp: 10, tags: '光環 / 治癒', endTurnHealAllies: 5, aiRole: 'support', aiTarget: 'none', skillDesc: '【治癒】己方回合結束時，為己方場上所有其他怪獸恢復 5 點生命值。' },
   { id: 'cactus', name: '仙人掌', rarity: 'R', atk: 0, hp: 30, tags: '荊棘 / 反擊', thorns: 5, aiRole: 'tank', aiTarget: 'none', skillDesc: '【反擊】每次受到傷害時，對攻擊者造成 5 點傷害。' },
 
   // --- 擴充包陣容 ---
-  { id: 'orc', name: '半獸人', rarity: 'R', atk: 20, hp: 15, tags: '白板', aiRole: 'dps', aiTarget: 'steel', skillDesc: '簡單粗暴的強大打手，沒有任何特殊能力，但一拳極痛。' },
+  { id: 'orc', name: '半獸人', rarity: 'R', atk: 20, hp: 10, tags: '白板', aiRole: 'dps', aiTarget: 'steel', skillDesc: '簡單粗暴的強大打手，沒有任何特殊能力，但一拳極痛。' },
   { id: 'grass', name: '草', rarity: 'R', atk: 5, hp: 10, tags: '蔓延', onTurnEnd: PASSIVE_DICT.grass_spread, aiRole: 'support', aiTarget: 'none', skillDesc: '【蔓延】己方回合結束時，若場上有空位，有 50% 機率生成一株「小草」。' },
   { id: 'salmon_fish', name: '鮭魚', rarity: 'R', atk: 10, hp: 10, tags: '洄游', returnHandChance: 0.5, aiRole: 'dps', aiTarget: 'lowest_hp', skillDesc: '【洄游】普通攻擊結算後，有 50% 機率直接彈回手牌中。' },
   { id: 'poison_mushroom', name: '毒蘑菇', rarity: 'N', atk: 5, hp: 10, tags: '毒氣', hasActiveSkill: true, skillTarget: 'none', onSkill: SKILL_DICT.poison_gas, aiRole: 'support', aiTarget: 'none', skillDesc: '【毒氣】發動能力：自損八百的無差別範圍攻擊，己方全體受 5 傷，敵方全體受 10 傷 (限一次)。' },
@@ -275,8 +288,8 @@ const CARD_TEMPLATES = [
   { id: 'fanny', name: '芬妮', rarity: 'SR', atk: 10, hp: 10, tags: '芬妮玩家', hasActiveSkill: true, skillTarget: 'none', onSkill: SKILL_DICT.fanny_chaos, aiRole: 'support', aiTarget: 'none', skillDesc: '【芬妮玩家】每回合可發動一次：觸發隨機事件。' },
 
   // --- 衍生卡 (不可被抽入牌庫) ---
-  { id: 'fish', name: '一種魚', rarity: 'UR', atk: 10, hp: 20, tags: '雙連擊', isDoubleStrike: true, isToken: true, aiRole: 'dps', aiTarget: 'highest_atk', skillDesc: '【雙連擊】不可思議的存在。每次攻擊對目標連續造成兩次傷害！' },
-  { id: 'yang', name: '陽', rarity: 'SR', atk: 0, hp: 20, tags: '雙生 / 治療', hasActiveSkill: true, skillTarget: 'ally', onSkill: SKILL_DICT.heal_ally, onTurnEnd: PASSIVE_DICT.yang_revert, isToken: true, aiRole: 'support', aiTarget: 'none', skillDesc: '【治療】發動能力：為一名友方怪獸恢復 10 點血量。若本回合使用能力，回合結束將變回「陰」。' },
+  { id: 'fish', name: '一種魚', rarity: 'UR', atk: 12, hp: 20, tags: '雙連擊', isDoubleStrike: true, isToken: true, aiRole: 'dps', aiTarget: 'highest_atk', skillDesc: '【雙連擊】不可思議的存在。每次攻擊對目標連續造成兩次傷害！' },
+  { id: 'yang', name: '陽', rarity: 'SR', atk: 0, hp: 20, tags: '雙生 / 治療', hasActiveSkill: true, skillTarget: 'ally', onSkill: SKILL_DICT.heal_ally, onTurnEnd: PASSIVE_DICT.yang_revert, isToken: true, aiRole: 'support', aiTarget: 'none', skillDesc: '【治療】發動能力：為一名友方怪獸（含自己）恢復 10 點血量。發動後回合結束將變回「陰」並繼承狀態。' },
   { id: 'little_grass', name: '小草', rarity: 'N', atk: 0, hp: 10, tags: '雜魚', noKillScore: true, isToken: true, aiRole: 'tank', aiTarget: 'none', skillDesc: '【雜魚】隨風飄搖的雜草，被摧毀時「不會」使敵方的擊殺進度條增加。' }
 ];
 

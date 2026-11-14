@@ -4,15 +4,18 @@
 }
 body {
   margin: 0; background: var(--bg); color: #f1f5f9;
-  font-family: -apple-system, sans-serif;
-  height: 100vh; overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  height: 100vh; height: 100dvh; overflow: hidden;
+  overscroll-behavior: none; /* 防止手機下拉誤觸重新整理 */
+  touch-action: manipulation; /* 消除手機雙擊放大延遲 */
   display: flex; flex-direction: column;
 }
 
-#start-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.95); z-index:100; display:flex; flex-direction:column; justify-content:center; align-items:center; }
+#start-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.95); z-index:100; display:flex; flex-direction:column; justify-content:center; align-items:center; padding: 20px; box-sizing: border-box; text-align: center; }
 .game-title { font-size:48px; color:var(--accent); margin-bottom:8px; font-weight:bold; }
 .game-subtitle { font-size:16px; color:#94a3b8; margin-bottom:40px; }
-.btn-start-game { background:#d97706; color:#fff; border:none; padding:16px 48px; font-size:24px; border-radius:12px; cursor:pointer; font-weight:bold; }
+.start-btn-group { display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; }
+.btn-start-game { background:#d97706; color:#fff; border:none; padding:16px 36px; font-size:22px; border-radius:12px; cursor:pointer; font-weight:bold; }
 .btn-start-game:hover { background:#f59e0b; transform:scale(1.05); }
 
 /* 主佈局 */
@@ -22,9 +25,16 @@ body {
 }
 
 /* 左側：資訊與日誌 */
-.left-col { flex: 0 0 220px; display: flex; flex-direction: column; gap: 10px; height: 100%; }
-#status-bar { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+.left-col { flex: 0 0 220px; display: flex; flex-direction: column; gap: 10px; height: 100%; min-height: 0; }
+#status-bar { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; flex-shrink: 0; }
 .status-item { background: #0f172a; padding: 8px; border-radius: 6px; text-align: center; }
+
+/* 電腦版隱藏手機專用元素 */
+.mobile-quick-btns, .mobile-drawer-header, #mobile-backdrop { display: none; }
+
+#log-drawer-wrapper {
+  display: flex; flex-direction: column; flex-grow: 1; min-height: 0;
+}
 
 /* 日誌區 - 彈簧貼底版 */
 #log-box { 
@@ -33,7 +43,7 @@ body {
   border-radius: 12px; 
   padding: 10px 12px; 
   flex-grow: 1; 
-  overflow: hidden; 
+  overflow-y: auto; 
   font-size: 13px; 
   color: #cbd5e1; 
   display: flex; 
@@ -50,17 +60,13 @@ body {
   flex-shrink: 0;
   animation: fadeIn 0.15s ease; 
 }
-
-/* 🌟 核心魔法：讓第一條訊息自帶強力彈簧，把整串訊息死死按在最底部！ */
-.log-msg:first-child {
-  margin-top: auto;
-}
+.log-msg:first-child { margin-top: auto; }
 
 /* 中間：戰鬥區與手牌 */
 .center-col { flex: 1; display: flex; flex-direction: column; gap: 8px; height: 100%; min-width: 400px; min-height: 0; }
 .board-container { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
 .player-area { display: flex; flex-direction: column; flex: 1 1 0; min-height: 0; justify-content: space-between; }
-.player-area > div[style*="display: flex"] { flex: 1 1 0; min-height: 0; }
+.row-indicator { display: flex; flex-direction: column; justify-content: space-around; font-size: 12px; color: #64748b; font-weight: bold; text-align: center; line-height: 1.2; }
 .area-label { font-size: 13px; color: #94a3b8; display: flex; justify-content: space-between; align-items: center; }
 .divider { border: 0; border-top: 1px solid var(--border); width: 100%; margin: 2px 0; }
 
@@ -82,7 +88,7 @@ body {
   flex-direction: column; 
   transition: 0.15s; 
   height: 100%; 
-  min-height: 50px; /* 給予最低保底高度，絕不壓成一條線 */
+  min-height: 50px;
   position: relative; 
   box-sizing: border-box;
 }
@@ -100,6 +106,40 @@ button:disabled { background: #1e293b; color: #475569; cursor: not-allowed; }
 .btn-skill { background: #0284c7; } .btn-skill:hover { background: #0369a1; }
 .btn-draw { background: #d97706; } .btn-draw:hover { background: #f59e0b; }
 .btn-end { background: #475569; }
+.btn-lobby { background: #334155; border-color: #64748b; color: #e2e8f0; width: 100%; }
+.btn-lobby:hover { background: #991b1b; border-color: #f43f5e; color: #fff; }
+
+/* 二次確認小視窗 */
+#confirm-lobby-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  z-index: 200;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
+#confirm-lobby-modal.open { display: flex; }
+
+.confirm-box {
+  background: var(--panel);
+  border: 2px solid #475569;
+  border-radius: 16px;
+  padding: 22px 24px;
+  max-width: 320px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.85);
+  animation: fadeIn 0.15s ease;
+}
+.confirm-title { font-size: 20px; font-weight: bold; color: #fbbf24; margin-bottom: 10px; }
+.confirm-desc { font-size: 14px; color: #cbd5e1; line-height: 1.5; margin-bottom: 20px; }
+.confirm-actions { display: flex; gap: 12px; justify-content: center; }
+.confirm-actions button { flex: 1; padding: 10px 14px; font-size: 15px; border-radius: 8px; }
+.btn-confirm-cancel { background: #334155; }
+.btn-confirm-ok { background: #991b1b; border-color: #f43f5e; }
+.btn-confirm-ok:hover { background: #b91c1c; }
 
 /* 手牌區 */
 #hand-container { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px; height: 140px; display: flex; flex-direction: column; flex-shrink: 0; }
@@ -110,7 +150,8 @@ button:disabled { background: #1e293b; color: #475569; cursor: not-allowed; }
 .hand-card.selected { border-color: #38bdf8; transform: translateY(-8px); box-shadow: 0 0 8px rgba(56,189,248,0.5); }
 
 /* 右側：卡牌說明 */
-.right-col { flex: 0 0 250px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 15px; display: flex; flex-direction: column; gap: 12px; height: 100%; overflow-y: auto; }
+.right-col { flex: 0 0 250px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 15px; display: flex; flex-direction: column; gap: 12px; height: 100%; overflow-y: auto; box-sizing: border-box; }
+#info-panel { display: flex; flex-direction: column; gap: 8px; }
 .info-placeholder { color: #64748b; text-align: center; margin-top: 50px; font-size: 14px; }
 .info-name { font-size: 20px; font-weight: bold; color: #fff; text-align: center; margin-bottom: 4px; }
 .info-tags { font-size: 12px; color: #fbbf24; text-align: center; margin-bottom: 12px; }
@@ -132,7 +173,7 @@ button:disabled { background: #1e293b; color: #475569; cursor: not-allowed; }
 .btn-ai { background: #0284c7; }
 .btn-ai:hover { background: #0369a1; }
 
-/* 🌟 全新傷害與補血跳字特效 🌟 */
+/* 傷害與補血跳字特效 */
 .dmg-popup {
   position: fixed;
   transform: translate(-50%, -50%);
@@ -153,18 +194,15 @@ button:disabled { background: #1e293b; color: #475569; cursor: not-allowed; }
   100% { opacity: 0; margin-top: -50px; }
 }
 
-/* ==========================================
-   🌟 新手教學專屬樣式 (Tutorial Mode)
-========================================== */
+/* 新手教學專屬樣式 */
 .btn-tutorial { background: #10b981; }
 .btn-tutorial:hover { background: #059669; }
 
-/* 教學橫幅 (小黑板) 改為絕對定位浮動 */
 #tutorial-banner {
   display: flex;
   width: 100%;
   box-sizing: border-box;
-  flex-shrink: 0; /* 自己不縮水，去擠壓下面的戰鬥區 */
+  flex-shrink: 0;
   align-items: center;
   background: rgba(15, 23, 42, 0.95);
   border: 2px solid #fbbf24;
@@ -180,47 +218,14 @@ button:disabled { background: #1e293b; color: #475569; cursor: not-allowed; }
   to { opacity: 1; transform: translateY(0); }
 }
 
-.tutorial-icon {
-  font-size: 32px;
-  filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.6));
-}
+.tutorial-icon { font-size: 32px; filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.6)); }
+.tutorial-content { flex-grow: 1; display: flex; flex-direction: column; gap: 4px; }
+.tutorial-title { color: #fbbf24; font-size: 16px; font-weight: bold; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+.tutorial-desc { color: #e2e8f0; font-size: 13px; line-height: 1.4; }
 
-.tutorial-content {
-  flex-grow: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
+.btn-exit-tutorial { background: transparent; color: #94a3b8; border: 1px solid #475569; padding: 6px 10px; font-size: 12px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+.btn-exit-tutorial:hover { background: #334155; color: #f1f5f9; }
 
-.tutorial-title {
-  color: #fbbf24;
-  font-size: 16px;
-  font-weight: bold;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
-}
-
-.tutorial-desc {
-  color: #e2e8f0;
-  font-size: 13px;
-  line-height: 1.4;
-}
-
-.btn-exit-tutorial {
-  background: transparent;
-  color: #94a3b8;
-  border: 1px solid #475569;
-  padding: 6px 10px;
-  font-size: 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.btn-exit-tutorial:hover {
-  background: #334155;
-  color: #f1f5f9;
-}
-
-/* 教學嚴格防呆高亮 (金邊呼吸) */
 .tutorial-highlight {
   position: relative;
   z-index: 10;
@@ -232,4 +237,166 @@ button:disabled { background: #1e293b; color: #475569; cursor: not-allowed; }
 @keyframes tutorialPulse {
   from { box-shadow: 0 0 0 2px #fbbf24, 0 0 5px rgba(251, 191, 36, 0.3); }
   to { box-shadow: 0 0 0 2px #fbbf24, 0 0 20px rgba(251, 191, 36, 0.8); transform: scale(1.02); }
+}
+
+/* ==========================================
+   📱 手機版響應式佈局 (螢幕寬度 <= 768px)
+========================================== */
+@media (max-width: 768px) {
+  .game-title { font-size: 36px; }
+  .game-subtitle { font-size: 13px; margin-bottom: 24px; }
+  .start-btn-group { flex-direction: column; width: 100%; max-width: 280px; gap: 12px; }
+  .btn-start-game { padding: 14px 20px; font-size: 18px; width: 100%; }
+
+  /* 整體改為直向單屏滿版 */
+  .main-layout {
+    flex-direction: column;
+    padding: 6px;
+    gap: 6px;
+  }
+
+  /* 頂部精簡狀態列 */
+  .left-col {
+    flex: 0 0 auto;
+    width: 100%;
+    height: auto;
+  }
+  #status-bar {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 8px;
+    gap: 4px;
+    border-radius: 10px;
+    font-size: 11px;
+  }
+  .status-item {
+    padding: 4px 6px;
+    flex: 1 1 auto;
+    white-space: nowrap;
+  }
+  .desktop-only-stat, .desktop-only-btn { display: none; }
+
+  .mobile-quick-btns {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .btn-mobile-drawer {
+    padding: 4px 8px;
+    font-size: 11px;
+    background: #334155;
+    border-color: #64748b;
+  }
+  .btn-lobby-mobile {
+    background: #475569;
+  }
+
+  /* 戰場中央區解除 400px 寬度限制 */
+  .center-col {
+    min-width: 0;
+    width: 100%;
+    gap: 6px;
+  }
+
+  .board-container {
+    padding: 6px 8px;
+    gap: 4px;
+  }
+  .area-label { font-size: 11px; }
+  .row-indicator { font-size: 10px; }
+  .grid { grid-gap: 5px; }
+  .slot { min-height: 44px; border-radius: 6px; }
+
+  /* 場上與手牌卡片字級微調，避免長名字擠爆 */
+  .card { padding: 3px 4px; }
+  .card-title { font-size: 12px; line-height: 1.15; }
+  .card-tags { font-size: 9px; }
+  .card-stats { font-size: 11px; }
+
+  /* 動作選單更緊湊 */
+  #action-menu { padding: 6px 8px; }
+  #action-target-tip { font-size: 12px; }
+  #action-menu button { padding: 6px 10px; font-size: 12px; }
+
+  /* 底部手牌列 */
+  #hand-container {
+    height: 118px;
+    padding: 6px 8px;
+    border-radius: 10px;
+  }
+  .hand-actions button { padding: 4px 8px; font-size: 11px; }
+  #hand-list {
+    padding-top: 4px;
+    gap: 6px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .hand-card {
+    flex: 0 0 82px;
+    height: 94%;
+  }
+  .hand-card:hover { transform: none; }
+  .hand-card.selected { transform: translateY(-5px); }
+
+  /* 教學橫幅手機縮小版 */
+  #tutorial-banner { padding: 6px 10px; gap: 8px; }
+  .tutorial-icon { font-size: 22px; }
+  .tutorial-title { font-size: 13px; }
+  .tutorial-desc { font-size: 11px; }
+
+  /* 手機版彈出式抽屜（戰報 & 卡牌詳情） */
+  #mobile-backdrop.open {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.65);
+    z-index: 80;
+  }
+
+  #log-drawer-wrapper,
+  .right-col {
+    display: none;
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    bottom: 12px;
+    max-height: 62vh;
+    background: var(--panel);
+    border: 2px solid #475569;
+    border-radius: 14px;
+    padding: 12px;
+    z-index: 90;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+    flex-direction: column;
+    height: auto;
+    flex: none;
+    width: auto;
+  }
+
+  #log-drawer-wrapper.open,
+  .right-col.open {
+    display: flex;
+  }
+
+  #log-drawer-wrapper #log-box {
+    height: 45vh;
+  }
+
+  .mobile-drawer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: bold;
+    font-size: 14px;
+    color: #fbbf24;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #334155;
+  }
+  .btn-close-drawer {
+    padding: 4px 10px;
+    font-size: 12px;
+    background: #334155;
+  }
 }
