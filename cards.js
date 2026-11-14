@@ -4,6 +4,11 @@
 // 🛠️ 主動技能字典 (所有主動招式都在這裡集中管理)
 // ==========================================
 const SKILL_DICT = {
+  // 🌟 共用小工具：檢查指定玩家場上是否有「越求的俗頭」的範圍防護
+  hasAoeProtect: (targetPlayer, ctx) => {
+    return Object.values(ctx.board[targetPlayer]).some(c => c && c.aoeProtect && !c.isSealed);
+  },
+
   // 鍬形蟲勇者：額外斬擊
   brave_slash: (attacker, defender, ctx) => {
     ctx.logMsg(`⚔️ 【${attacker.name}】發動額外斬擊！`);
@@ -77,8 +82,7 @@ const SKILL_DICT = {
   // 血月：全域破壞光線
   aoe_laser: (attacker, _, ctx) => {
     const op = ctx.turn === 1 ? 2 : 1;
-    let hasProtect = Object.values(ctx.board[op]).some(c => c && c.aoeProtect && !c.isSealed);
-    if(hasProtect) {
+    if(SKILL_DICT.hasAoeProtect(op, ctx)) {
       ctx.logMsg(`🪨 敵方場上存在【越求的俗頭】！血月的破壞光線被徹底吸收！`);
     } else {
       ctx.logMsg(`🩸 【${attacker.name}】發射破壞光線！敵方全體受到 10 點傷害！`);
@@ -119,12 +123,16 @@ const SKILL_DICT = {
       }
     }
     const op = ctx.turn === 1 ? 2 : 1;
-    for(let s in ctx.board[op]) {
-      let c = ctx.board[op][s];
-      if(c) {
-        let d = ctx.dealDamage(c, 10, attacker, false);
-        ctx.showPopup(op, s, `-${d}`, 'normal');
-        ctx.checkDeath(op, s, attacker);
+    if(SKILL_DICT.hasAoeProtect(op, ctx)) {
+      ctx.logMsg(`🪨 敵方場上存在【越求的俗頭】！毒蘑菇的劇毒被徹底吸收！`);
+    } else {
+      for(let s in ctx.board[op]) {
+        let c = ctx.board[op][s];
+        if(c) {
+          let d = ctx.dealDamage(c, 10, attacker, false);
+          ctx.showPopup(op, s, `-${d}`, 'normal');
+          ctx.checkDeath(op, s, attacker);
+        }
       }
     }
     attacker.skillUsedLimit = true;
@@ -181,11 +189,13 @@ const SKILL_DICT = {
       // 5 【天降神兵】我方擊殺進度條 +1
       ctx.logMsg(`👑 【天降神兵】命運眷顧！己方擊殺進度條直接 +1！`);
       ctx.kills[ctx.turn] = Math.min(10, ctx.kills[ctx.turn] + 1);
+      ctx.logMsg(`📊 戰況更新｜P1: ${ctx.kills[1]} 殺 vs P2: ${ctx.kills[2]} 殺`);
       if (ctx.kills[ctx.turn] >= 10) ctx.checkGameWin(ctx.turn);
     } else if (roll === 6) {
       // 6 【雷暴將至】我方擊殺進度條 -1，然後所有玩家抽一張牌
       ctx.logMsg(`⚡ 【雷暴將至】災禍臨頭！己方擊殺進度條 -1，全體玩家各抽 1 張牌！`);
       ctx.kills[ctx.turn] = Math.max(0, ctx.kills[ctx.turn] - 1);
+      ctx.logMsg(`📊 戰況更新｜P1: ${ctx.kills[1]} 殺 vs P2: ${ctx.kills[2]} 殺`);
       [1, 2].forEach(p => {
         if (ctx.decks[p].length > 0 && ctx.hands[p].length < 7) {
           ctx.hands[p].push(ctx.decks[p].pop());
@@ -195,7 +205,7 @@ const SKILL_DICT = {
     }
     render();
   }
-}; // 👈 補上這個收尾大括號與分號！
+};
 
 
 // ==========================================
@@ -261,7 +271,7 @@ const CARD_TEMPLATES = [
   { id: 'salmon', name: '鮭魚神', rarity: 'SSR', atk: 10, hp: 20, tags: '詛咒 / 復活', hasActiveSkill: true, aiRole: 'support', aiTarget: 'none', skillTarget: 'none', isSuicide: true, needsGraveyard: true, onSkill: SKILL_DICT.revive_self_destruct, skillDesc: '【復活】發動特殊能力：犧牲自己送入墓地，並復活當前墓地最底部的怪獸至自身空位。' },
   { id: 'ice_dragon', name: '冰龍王', rarity: 'SR', atk: 15, hp: 30, tags: '封印', isDragon: true, hasActiveSkill: true, aiRole: 'dps', aiTarget: 'highest_atk', skillTarget: 'enemy', onSkill: SKILL_DICT.seal, skillDesc: '【封印】發動特殊能力：使一名敵方怪獸永久失去特殊能力 (每局限發動一次)。' },
   { id: 'wind_dragon', name: '風龍王', rarity: 'SR', atk: 15, hp: 20, tags: '控場 / 大風吹', isDragon: true, hasActiveSkill: true, aiRole: 'support', aiTarget: 'highest_atk', skillTarget: 'enemy', onSkill: SKILL_DICT.great_wind, skillDesc: '【控場】發動能力：發動大風吹！將目標所在的一路(左或右)的前後排強制互換位置 (限一次)。' },
-  { id: 'bloodmoon', name: '血月', rarity: 'SSR', atk: 15, hp: 20, tags: '速攻 / 光線', isQuick: true, hasActiveSkill: true, aiRole: 'dps', aiTarget: 'none', skillTarget: 'none', onSkill: SKILL_DICT.aoe_laser, skillDesc: '【破壞光線】發動特殊能力：釋放全域能量，對敵方場上所有怪獸各造成 10 點傷害。' },
+  { id: 'bloodmoon', name: '血月', rarity: 'SSR', atk: 15, hp: 20, tags: '速攻 / 範圍', isQuick: true, hasActiveSkill: true, aiRole: 'dps', aiTarget: 'none', skillTarget: 'none', onSkill: SKILL_DICT.aoe_laser, skillDesc: '【範圍】【破壞光線】發動特殊能力：釋放全域能量，對敵方場上所有怪獸各造成 10 點傷害。' },
   { id: 'butterfly', name: '蝴蝶', rarity: 'N', atk: 10, hp: 1, tags: '迴避', aiRole: 'tank', aiTarget: 'lowest_hp', dodgeChance: 0.5, skillDesc: '【迴避】受傷時擲 6 面骰，若點數大於 3，則完全免疫該次傷害。' },
   { id: 'dung_beetle', name: '糞金龜', rarity: 'R', atk: 5, hp: 30, tags: '必定暴擊', isCrit: true, aiRole: 'tank', aiTarget: 'steel', skillDesc: '【必定暴擊】每次攻擊必定觸發暴擊(1.5倍傷害)，且暴擊可無視鋼鐵減傷！' },
 
@@ -282,7 +292,7 @@ const CARD_TEMPLATES = [
   { id: 'orc', name: '半獸人', rarity: 'R', atk: 20, hp: 10, tags: '白板', aiRole: 'dps', aiTarget: 'steel', skillDesc: '簡單粗暴的強大打手，沒有任何特殊能力，但一拳極痛。' },
   { id: 'grass', name: '草', rarity: 'R', atk: 5, hp: 10, tags: '蔓延', onTurnEnd: PASSIVE_DICT.grass_spread, aiRole: 'support', aiTarget: 'none', skillDesc: '【蔓延】己方回合結束時，若場上有空位，有 50% 機率生成一株「小草」。' },
   { id: 'salmon_fish', name: '鮭魚', rarity: 'R', atk: 10, hp: 10, tags: '洄游', returnHandChance: 0.5, aiRole: 'dps', aiTarget: 'lowest_hp', skillDesc: '【洄游】普通攻擊結算後，有 50% 機率直接彈回手牌中。' },
-  { id: 'poison_mushroom', name: '毒蘑菇', rarity: 'N', atk: 5, hp: 10, tags: '毒氣', hasActiveSkill: true, skillTarget: 'none', onSkill: SKILL_DICT.poison_gas, aiRole: 'support', aiTarget: 'none', skillDesc: '【毒氣】發動能力：自損八百的無差別範圍攻擊，己方全體受 5 傷，敵方全體受 10 傷 (限一次)。' },
+  { id: 'poison_mushroom', name: '毒蘑菇', rarity: 'N', atk: 5, hp: 10, tags: '範圍 / 毒氣', hasActiveSkill: true, skillTarget: 'none', onSkill: SKILL_DICT.poison_gas, aiRole: 'support', aiTarget: 'none', skillDesc: '【範圍】【毒氣】發動能力：自損八百的無差別範圍攻擊，己方全體受 5 傷，敵方全體受 10 傷 (限一次)。' },
   { id: 'fire_dragon', name: '火龍王', rarity: 'SSR', atk: 7, hp: 20, tags: '飛行 / 濺射', isDragon: true, isFlying: true, splashSameRow: true, aiRole: 'dps', aiTarget: 'lowest_hp', skillDesc: '【飛行】【火焰】無視掩護直擊後排。攻擊命中時，對同排左右兩側造成等量濺射傷害。' },
   { id: 'dragon_slayer', name: '屠龍者', rarity: 'SR', atk: 10, hp: 15, tags: '屠龍', vsDragonDouble: true, aiRole: 'dps', aiTarget: 'highest_atk', skillDesc: '【屠龍】對付龍族時刀刃越發鋒利。攻擊帶有「龍族」標籤的目標時，傷害翻倍！' },
   { id: 'fanny', name: '芬妮', rarity: 'SR', atk: 10, hp: 10, tags: '芬妮玩家', hasActiveSkill: true, skillTarget: 'none', onSkill: SKILL_DICT.fanny_chaos, aiRole: 'support', aiTarget: 'none', skillDesc: '【芬妮玩家】每回合可發動一次：觸發隨機事件。' },

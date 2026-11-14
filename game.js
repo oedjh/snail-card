@@ -192,6 +192,7 @@ function checkDeath(player, slot, killerCard=null) {
     // 小草被消滅不計擊殺分數
     if(!c.noKillScore) {
       kills[op]++;
+      logMsg(`📊 戰況更新｜P1: ${kills[1]} 殺 vs P2: ${kills[2]} 殺`);
     } else {
       logMsg(`🌱 【小草】化作春泥，不計入敵方擊殺數！`);
     }
@@ -390,7 +391,7 @@ function executeAutoSkill(attacker) {
   hasUsedSkill = true;	
   playSound('skill');
   if (attacker.onSkill) {
-     const ctx = getGameContext();
+     const ctx = { ...getGameContext() };
      attacker.onSkill(attacker, null, ctx);
   }
   cancelAction();
@@ -442,7 +443,7 @@ function endTurn(isAuto = false) {
     c.quickBuff = false; 
     c.justSummoned = false;
   }
-// 🤢 【食品安全】回合結束流血結算
+  // 🤢 【食品安全】回合結束流血結算
   if (board.poisonDebuff && board.poisonDebuff[turn] > 0) {
     board.poisonDebuff[turn]--;
     logMsg(`🤢 【食品安全】毒性發作！P${turn} 全體怪獸受到 2 點傷害！(剩餘 ${board.poisonDebuff[turn]} 回合)`);
@@ -545,10 +546,7 @@ async function runAITurn() {
     for(let s in board[2]) {
        let c = board[2][s];
        if(c && !c.aiSkip && !c.isBurrowed) {
-         // 🌟 修正：普攻全隊一回合就是 1 次，拔掉 quickBuff 特權
          let canAtk = !hasAttacked && c.atk > 0;
-         
-         // 🌟 修正：技能判斷，剛召喚且無速攻不能放招；整隊已放過技能也不能放招
          let canSkill = c.hasActiveSkill && !c.isSealed && (!c.skillUsedLimit || c.needsGraveyard || c.id === 'fanny');
          if(c.justSummoned && !c.isQuick) canSkill = false;
          if(hasUsedSkill) canSkill = false;
