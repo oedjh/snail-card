@@ -648,7 +648,15 @@ function render() {
   document.getElementById("grave-txt").textContent = `墓地: ${sharedGraveyard.length}張`;
   document.getElementById("deck-txt").textContent = `牌庫 - P1: ${decks[1].length} | P2: ${decks[2].length}`;
   const drawBtn = document.getElementById("btn-draw");
-  if(hasDrawn || (isAIMode && turn === 2) || (hands[turn] && hands[turn].length >= 7)) { drawBtn.disabled = true; drawBtn.style.opacity = '0.5'; } else { drawBtn.disabled = false; drawBtn.style.opacity = '1'; }
+  const isDeckEmpty = !decks[turn] || decks[turn].length === 0;
+  drawBtn.textContent = isDeckEmpty ? "🃏 牌庫已空" : "🃏 抽 2 張";
+  if(hasDrawn || isDeckEmpty || (isAIMode && turn === 2) || (hands[turn] && hands[turn].length >= 7)) {
+    drawBtn.disabled = true;
+    drawBtn.style.opacity = '0.5';
+  } else {
+    drawBtn.disabled = false;
+    drawBtn.style.opacity = '1';
+  }
 
   for(let p=1; p<=2; p++) {
     for(let slot of ['front_l', 'front_r', 'back_l', 'back_r']) {
